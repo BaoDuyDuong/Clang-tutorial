@@ -33,7 +33,7 @@ int main()
     ci.createDiagnostics(0,NULL);
 
     TargetOptions to;
-    to.Triple = llvm::sys::getDefaultTargetTriple();
+    to.Triple = llvm::sys::getHostTriple();
     TargetInfo *pti = TargetInfo::CreateTargetInfo(ci.getDiagnostics(), to);
     ci.setTarget(pti);
 
@@ -41,7 +41,7 @@ int main()
     ci.createSourceManager(ci.getFileManager());
     ci.createPreprocessor();
 
-	const FileEntry *pFile = ci.getFileManager().getFile("test.c");
+    const FileEntry *pFile = ci.getFileManager().getFile("test.c");
     ci.getSourceManager().createMainFileID(pFile);
     ci.getPreprocessor().EnterMainSourceFile();
     ci.getDiagnosticClient().BeginSourceFile(ci.getLangOpts(),

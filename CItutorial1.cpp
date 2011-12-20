@@ -26,7 +26,7 @@ int main()
     ci.createDiagnostics(0,NULL);
 
     TargetOptions to;
-    to.Triple = llvm::sys::getDefaultTargetTriple();
+    to.Triple = llvm::sys::getHostTriple();
     TargetInfo *pti = TargetInfo::CreateTargetInfo(ci.getDiagnostics(), to);
     ci.setTarget(pti);
 

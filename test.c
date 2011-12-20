@@ -10,3 +10,9 @@ int main()
 	printf("Hello World\n");
 	return 0;
 }
+
+int foo()
+{
+	printf("Hello World\n", 1, 2, 3);
+	return 0;
+}

@@ -19,6 +19,7 @@
 #include "clang/Basic/Diagnostic.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/ASTConsumer.h"
+#include "clang/AST/RecursiveASTVisitor.h"
 #include "clang/Parse/Parser.h"
 #include "clang/Parse/ParseAST.h"
 
@@ -31,7 +32,7 @@ public:
     MyASTConsumer() : clang::ASTConsumer() { }
     virtual ~MyASTConsumer() { }
 
-    virtual bool HandleTopLevelDecl( clang::DeclGroupRef d)
+    virtual void HandleTopLevelDecl( clang::DeclGroupRef d)
     {
         static int count = 0;
         clang::DeclGroupRef::iterator it;
@@ -43,7 +44,6 @@ public:
             {
                 continue;
             }
-            std::cout << vd << std::endl;
             if( vd->isFileVarDecl() && vd->hasExternalStorage() )
             {
                 std::cerr << "Read top-level variable decl: '";
@@ -51,8 +51,21 @@ public:
                 std::cerr << std::endl;
             }
         }
-        return true;
     }
+};
+
+class TestConsumer : public clang::ASTConsumer, public clang::RecursiveASTVisitor<TestConsumer>
+{
+public:
+    TestConsumer() : clang::ASTConsumer() {}
+    bool VisitCallExpr (clang::CallExpr *E) {
+     llvm::errs() << "Function call maybe?! " << E->getNumArgs() << "\n";
+     return true;
+   }
+   
+   virtual void HandleTranslationUnit(clang::ASTContext &ctx) {
+     TraverseDecl(ctx.getTranslationUnitDecl());
+   }
 };
 
 /******************************************************************************
@@ -73,7 +86,7 @@ int main()
     ci.createDiagnostics(0,NULL);
 
     TargetOptions to;
-    to.Triple = llvm::sys::getDefaultTargetTriple();
+    to.Triple = llvm::sys::getHostTriple();
     TargetInfo *pti = TargetInfo::CreateTargetInfo(ci.getDiagnostics(), to);
     ci.setTarget(pti);
 
@@ -81,7 +94,8 @@ int main()
     ci.createSourceManager(ci.getFileManager());
     ci.createPreprocessor();
     ci.getPreprocessorOpts().UsePredefines = false;
-    MyASTConsumer *astConsumer = new MyASTConsumer();
+    //MyASTConsumer *astConsumer = new MyASTConsumer();
+    TestConsumer *astConsumer = new TestConsumer();
     ci.setASTConsumer(astConsumer);
 
     ci.createASTContext();
