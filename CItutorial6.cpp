@@ -22,6 +22,7 @@
 #include "clang/AST/RecursiveASTVisitor.h"
 #include "clang/Parse/Parser.h"
 #include "clang/Parse/ParseAST.h"
+#include "clang/Frontend/HeaderSearchOptions.h"
 
 /******************************************************************************
  *
@@ -59,7 +60,7 @@ class TestConsumer : public clang::ASTConsumer, public clang::RecursiveASTVisito
 public:
     TestConsumer() : clang::ASTConsumer() {}
     bool VisitCallExpr (clang::CallExpr *E) {
-     llvm::errs() << "Function call maybe?! " << E->getNumArgs() << "\n";
+     //llvm::errs() << "Function call maybe?! " << E->getNumArgs() << "\n";
      return true;
    }
    
@@ -67,6 +68,28 @@ public:
      TraverseDecl(ctx.getTranslationUnitDecl());
    }
 };
+
+class KDevDiagnosticConsumer : public clang::DiagnosticConsumer
+{
+public:
+        virtual void HandleDiagnostic(clang::DiagnosticsEngine::Level DiagLevel,
+                                      const clang::Diagnostic &Info);
+        virtual DiagnosticConsumer *clone(clang::DiagnosticsEngine &Diags) const;
+};
+
+void KDevDiagnosticConsumer::HandleDiagnostic(clang::DiagnosticsEngine::Level DiagLevel,
+                                                      const clang::Diagnostic &Info)
+{
+        llvm::SmallVectorImpl<char> str(1);
+        Info.FormatDiagnostic(str);
+        llvm::errs() << "Got diagnostic " << Info.getSourceManager().getSpellingLineNumber(Info.getLocation()) << " " << Info.getSourceManager().getSpellingColumnNumber(Info.getLocation())<< " " << &str[0] << " " << Info.getNumArgs() << " " << Info.getNumRanges() << "\n";
+        llvm::errs() << "foo\n";
+}
+
+clang::DiagnosticConsumer *KDevDiagnosticConsumer::clone(clang::DiagnosticsEngine &Diags) const
+{
+        return new KDevDiagnosticConsumer();
+}
 
 /******************************************************************************
  *
@@ -84,16 +107,52 @@ int main()
 
     CompilerInstance ci;
     ci.createDiagnostics(0,NULL);
+    //ci.createDiagnostics(0,NULL, new KDevDiagnosticConsumer());
 
+    ci.getHeaderSearchOpts().UseStandardSystemIncludes = true;
+    ci.getHeaderSearchOpts().AddPath("/usr/lib/clang/3.0/include/", clang::frontend::Angled, false, false, false);
+    ci.getHeaderSearchOpts().AddPath("/usr/include/", clang::frontend::Angled, false, false, false);
+    ci.getHeaderSearchOpts().AddPath("/usr/include/linux", clang::frontend::Angled, false, false, false);
+    ci.getHeaderSearchOpts().AddPath("/usr/include/c++/4.6.2", clang::frontend::Angled, false, false, false);
+    ci.getHeaderSearchOpts().AddPath("/usr/include/c++/4.6.2/tr1", clang::frontend::Angled, false, false, false);
+    ci.getHeaderSearchOpts().AddPath("/usr/include/c++/4.6.2/x86_64-unknown-linux-gnu", clang::frontend::Angled, false, false, false);
+
+    ci.getLangOpts().C99 = 1;
+    ci.getLangOpts().C1X = 1;
+    ci.getLangOpts().GNUMode = 1;
+    ci.getLangOpts().GNUKeywords = 1;
+    ci.getLangOpts().CPlusPlus = 1;
+    ci.getLangOpts().Bool = 1;
+    ci.getLangOpts().NoBuiltin = 0;
     TargetOptions to;
     to.Triple = llvm::sys::getHostTriple();
+
     TargetInfo *pti = TargetInfo::CreateTargetInfo(ci.getDiagnostics(), to);
+    clang::Builtin::Context builtinContext;
+    //builtinContext.InitializeBuiltins(identifierTable, ci.getLangOpts());
+    builtinContext.InitializeTarget(*pti);
     ci.setTarget(pti);
+    
+
+    /*
+    const clang::Builtin::Info *records;
+    unsigned nRecords;
+    ci.getTarget().getTargetBuiltins(records, nRecords);
+    for (int i = 0; i < nRecords; i++)
+	llvm::outs() << records[i].Name << "\n";
+    llvm::outs() << nRecords;
+    return 0;
+    */
+
 
     ci.createFileManager();
     ci.createSourceManager(ci.getFileManager());
     ci.createPreprocessor();
-    ci.getPreprocessorOpts().UsePredefines = false;
+    builtinContext.InitializeBuiltins(ci.getPreprocessor().getIdentifierTable(), ci.getLangOpts());
+    ci.getPreprocessorOpts().UsePredefines = true;
+
+    ci.getHeaderSearchOpts().Verbose = 1;
+    
     //MyASTConsumer *astConsumer = new MyASTConsumer();
     TestConsumer *astConsumer = new TestConsumer();
     ci.setASTConsumer(astConsumer);
